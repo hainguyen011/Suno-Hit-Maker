@@ -86,7 +86,7 @@
 #### **Bước 1: Tải Source Code**
 ```bash
 # Clone repository từ GitHub
-git clone https://github.com/hainguyen011/Suno-Hit-Maker.git
+git clone https://github.com/hainguyen011/VSunoMaker.git
 
 # Hoặc tải file ZIP và giải nén
 ```
@@ -100,7 +100,7 @@ git clone https://github.com/hainguyen011/Suno-Hit-Maker.git
    ![Developer Mode](https://i.imgur.com/example.png)
 
 4. Click nút **"Load unpacked"** (Tải tiện ích đã giải nén)
-5. Chọn thư mục `Suno-Hit-Maker` (thư mục chứa file `manifest.json`)
+5. Chọn thư mục `VSunoMaker` (thư mục chứa file `manifest.json`)
 6. Extension sẽ xuất hiện trong danh sách với tên **"VSunoMaker AI"**
 
 #### **Bước 3: Lấy Gemini API Key**
@@ -365,3 +365,4 @@ MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 Made with ❤️ and 🎵 by Anton
 
 </div>
+
