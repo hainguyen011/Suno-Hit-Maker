@@ -11,10 +11,10 @@ export const Prompts = {
         const { concept, vibe, artist, gender, region, isInstrumental, isCustomLyrics, customSystemPrompt, customStructure } = params;
 
         const artistContext = artist ? `\n    Đặc biệt, hãy nghiên cứu sâu và mô phỏng "ADN âm nhạc" của nghệ sĩ: "${artist}". 
-    - Phong cách hát (Vocal Style): Cách luyến láy, ngân rung đặc trưng.` : "";
+        - Phong cách hát (Vocal Style): Cách luyến láy, ngân rung đặc trưng.` : "";
 
         const genderContext = gender && gender !== 'Random' ? `\n    - Giới tính giọng hát (Vocal Gender): BẮT BUỘC phải là "${gender}".` : "";
-        const regionContext = region && region !== 'Standard' ? `\n    - Vùng miền (Region/Accent): Lời bài hát và phong cách hát phải mang âm hưởng "${region} Vietnam". Lời bài hát nên sử dụng một số từ ngữ địa phương đặc trưng của vùng này để tạo cảm giác chân thực.` : "";
+        const regionContext = region && region !== 'Standard' ? `\n  - Vùng miền (Region/Accent): Lời bài hát và phong cách hát phải mang âm hưởng "${region} Vietnam". Lời bài hát nên sử dụng một số từ ngữ địa phương đặc trưng của vùng này để tạo cảm giác chân thực.` : "";
 
         // --- PROMPT MODES ---
         let promptModeInstructions = "";
@@ -48,8 +48,9 @@ export const Prompts = {
         "${concept}"
         
         - Nhiệm vụ của bạn:
-        1. Phân tích lời bài hát này để chọn ra "style" và "title" phù hợp nhất.
-        2. Giữ nguyên lời bài hát gốc trong trường "lyrics". Bạn có thể thêm các thẻ [Meta Tags] như [Verse], [Chorus] vào trước các đoạn nếu chưa có, nhưng KHÔNG được thay đổi nội dung lời.
+        1. Phân tích lời bài hát kết hợp với phong cách chủ đạo là: "${vibe}".${genderContext}${regionContext}
+        2. Chọn ra "style" và "title" phù hợp nhất dựa trên các thông số trên.
+        3. Giữ nguyên lời bài hát gốc trong trường "lyrics". Bạn có thể thêm các thẻ [Meta Tags] như [Verse], [Chorus] vào trước các đoạn nếu chưa có, nhưng KHÔNG được thay đổi nội dung lời.
             `;
         } else {
             // Default: Creating from Concept

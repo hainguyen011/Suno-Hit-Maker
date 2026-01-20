@@ -19,7 +19,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 2. Polish Lyrics
     if (request.action === "POLISH_LYRICS") {
         const prompt = Prompts.polishLyrics(request.lyrics);
-        callGemini(prompt, request.apiKey)
+        callGemini(prompt, request.apiKey, request.model)
             .then(data => sendResponse({ success: true, data: data }))
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 3. Fuse Styles
     if (request.action === "FUSE_STYLES") {
         const prompt = Prompts.fuseStyles(request.styleA, request.styleB);
-        callGemini(prompt, request.apiKey)
+        callGemini(prompt, request.apiKey, request.model)
             .then(data => sendResponse({ success: true, data: data }))
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 4. Clone Vibe
     if (request.action === "CLONE_VIBE") {
         const prompt = Prompts.cloneVibe(request.source);
-        callGemini(prompt, request.apiKey)
+        callGemini(prompt, request.apiKey, request.model)
             .then(text => {
                 // Try Parse JSON logic
                 try {
@@ -54,7 +54,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // 5. Analyze Image (Multimodal)
     if (request.action === "ANALYZE_IMAGE") {
-        callGeminiVision(request.imageBase64, request.apiKey)
+        callGeminiVision(request.imageBase64, request.apiKey, request.model)
             .then(text => {
                 try {
                     const jsonMatch = text.match(/\{[\s\S]*?\}/);
@@ -85,7 +85,7 @@ async function handleComposition(request) {
     const prompt = Prompts.composeMusic(request);
 
     // Call API
-    const aiText = await callGemini(prompt, request.apiKey);
+    const aiText = await callGemini(prompt, request.apiKey, request.model);
 
     // Parse JSON Result
     const jsonMatch = aiText.match(/\{[\s\S]*?\}/);

@@ -3,8 +3,8 @@
  * Handles communication with Gemini API
  */
 
-export async function callGemini(promptText, apiKey, model = "gemini-2.5-flash") {
-    // Note: Fallback to flash if 2.5 is not stable/available for user, but user prompt had 2.5
+export async function callGemini(promptText, apiKey, model = "gemini-2.0-flash-exp") {
+    // Note: Use 2.0-flash-exp for best performance/cost
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
@@ -26,15 +26,18 @@ export async function callGemini(promptText, apiKey, model = "gemini-2.5-flash")
             throw new Error("No candidates returned from AI.");
         }
 
-        return data.candidates[0].content.parts[0].text.trim();
+        let text = data.candidates[0].content.parts[0].text.trim();
+        // Global cleanup for markdown code blocks
+        text = text.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+        return text;
     } catch (error) {
         console.error("Gemini API Error:", error);
         throw error;
     }
 }
 
-export async function callGeminiVision(base64Image, apiKey) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+export async function callGeminiVision(base64Image, apiKey, model = "gemini-1.5-flash") {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const payload = {
         contents: [{

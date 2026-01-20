@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI ELEMENTS ---
     const tabs = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    let typingTimer = null;
 
     // --- PREMIUM FEATURES (STUDIO) ---
     const magicPolishBtn = document.getElementById('magic-polish');
@@ -27,66 +28,133 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            updateLog("> Magic Polisher: Đang phân tích vần điệu...");
+            updateLog("Magic Polisher: Đang phân tích vần điệu...");
 
             chrome.runtime.sendMessage({
                 action: "POLISH_LYRICS",
                 lyrics: lyrics,
-                apiKey: apiKey
+                apiKey: apiKey,
+                model: modelSelect.value
             }, (response) => {
                 if (response && response.success) {
-                    conceptInput.value = response.data;
+                    // Clean markdown if AI returns it
+                    let cleanedData = response.data.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+                    conceptInput.value = cleanedData;
                     updateLog("> Success: Lời bài hát đã được chuốt lại!");
                 } else {
-                    updateLog("! Error: " + (response.error || "Unknown"));
+                    updateLog("Lỗi: " + (response.error || "Unknown"));
                 }
             });
         });
     }
 
     // 2. See The Sound (Image Upload)
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const btnRemoveImage = document.getElementById('btn-remove-image');
+
+    // NEW: Suggestion Box Elements
+    const stsResultBox = document.getElementById('sts-result-box');
+    const stsConceptText = document.getElementById('sts-concept-text');
+    const stsVibeText = document.getElementById('sts-vibe-text');
+    const btnApplySts = document.getElementById('btn-apply-sts');
+
     imageUploadBox.addEventListener('click', () => imageInput.click());
+
     imageInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        // Show Preview
+        const readerPreview = new FileReader();
+        readerPreview.onload = (event) => {
+            imagePreview.src = event.target.result;
+            imagePreviewContainer.style.display = 'flex';
+            imageUploadBox.style.display = 'none';
+        };
+        readerPreview.readAsDataURL(file);
+
         const apiKey = apiKeyInput.value.trim();
         if (!apiKey) {
-            updateLog("! Error: Cần API Key để phân tích ảnh.");
+            updateLog("Lỗi: Cần API Key để phân tích ảnh.");
             return;
         }
 
-        updateLog("> See The Sound: Đang tải và phân tích ảnh...");
+        updateLog("See The Sound: Đang tải và phân tích ảnh...");
         const reader = new FileReader();
         reader.onloadend = () => {
-            const base64String = reader.result.split(',')[1]; // Remove data:image/type;base64,
+            const base64String = reader.result.split(',')[1];
 
             chrome.runtime.sendMessage({
                 action: "ANALYZE_IMAGE",
                 imageBase64: base64String,
-                apiKey: apiKey
+                apiKey: apiKey,
+                model: modelSelect.value
             }, (response) => {
                 if (response && response.success) {
-                    conceptInput.value = response.data.description;
-                    selectedVibe = response.data.vibe;
-                    customVibeInput.value = selectedVibe;
+                    // Show Suggestion Box instead of Auto-fill
+                    stsConceptText.innerText = response.data.description;
+                    stsVibeText.innerText = response.data.vibe;
+                    stsResultBox.style.display = 'block';
 
-                    // Switch to concept mode if in lyrics mode
-                    if (inputModeToggle.checked) {
-                        inputModeToggle.checked = false;
-                        // trigger change event manually or call update UI
-                        inputModeToggle.dispatchEvent(new Event('change'));
-                    }
+                    // Store temp data
+                    stsResultBox.dataset.concept = response.data.description;
+                    stsResultBox.dataset.vibe = response.data.vibe;
 
-                    updateLog("> Success: AI đã 'nghe' thấy âm thanh từ ảnh!");
-                    updateLog(`> Vibe: ${selectedVibe}`);
+                    updateLog("Success: Đã phân tích xong! Xem gợi ý bên dưới.");
                 } else {
-                    updateLog("! Error: " + (response.error || "Failed using Gemni Vision."));
+                    updateLog("Lỗi: " + (response.error || "Failed using Gemni Vision."));
+                    // Reset if failed
+                    btnRemoveImage.click();
                 }
             });
         };
         reader.readAsDataURL(file);
     });
+
+    if (btnRemoveImage) {
+        btnRemoveImage.addEventListener('click', () => {
+            imageInput.value = "";
+            imagePreview.src = "";
+            imagePreviewContainer.style.display = 'none';
+            imageUploadBox.style.display = 'flex';
+            // Hide Suggestion Box
+            if (stsResultBox) stsResultBox.style.display = 'none';
+            if (stsConceptText) stsConceptText.innerText = '...';
+            if (stsVibeText) stsVibeText.innerText = '...';
+        });
+    }
+
+    if (btnApplySts) {
+        btnApplySts.addEventListener('click', () => {
+            const concept = stsResultBox.dataset.concept;
+            const vibe = stsResultBox.dataset.vibe;
+
+            if (concept && vibe) {
+                // Populate Inputs
+                conceptInput.value = concept;
+                customVibeInput.value = vibe;
+                selectedVibe = vibe;
+
+                // Switch to Concept Mode if needed
+                if (inputModeToggle.checked) {
+                    inputModeToggle.checked = false;
+                    // Trigger change to update UI (segmented control, placeholders)
+                    inputModeToggle.dispatchEvent(new Event('change'));
+                }
+
+                // Restore Vibe Chip UI
+                restoreVibeChip(selectedVibe);
+
+                // Save and Notify
+                saveState();
+                updateLog("Đã áp dụng ý tưởng từ ảnh!");
+
+                // Scroll to Top to show Compose area
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    }
 
     // 3. Style Fusion
     btnFuseStyle.addEventListener('click', () => {
@@ -100,12 +168,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateLog("> Fusion Engine: Đang lai tạo DNA âm nhạc...");
+        btnFuseStyle.disabled = true;
+        btnFuseStyle.innerText = "ĐANG LAI TẠO DNA...";
+
         chrome.runtime.sendMessage({
             action: "FUSE_STYLES",
             styleA: sA,
             styleB: sB,
-            apiKey: apiKey
+            apiKey: apiKey,
+            model: modelSelect.value
         }, (res) => {
+            btnFuseStyle.disabled = false;
+            btnFuseStyle.innerText = "LAI TẠO STYLE";
+
             if (res && res.success) {
                 customVibeInput.value = res.data;
                 selectedVibe = res.data;
@@ -122,24 +197,61 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiKey = apiKeyInput.value.trim();
 
         if (!sourceText || !apiKey) {
-            updateLog("! Error: Nhập nguồn (lời/mô tả) và API Key.");
+            updateLog("Lỗi: Nhập nguồn (lời/mô tả) và API Key.");
             return;
         }
 
-        updateLog("> Cloner: Đang giải mã DNA bài hát gốc...");
+        updateLog("Cloner: Đang giải mã DNA bài hát gốc...");
+        btnCloneVibe.disabled = true;
+        btnCloneVibe.innerText = "ĐANG GIẢI MÃ DNA...";
+
         chrome.runtime.sendMessage({
             action: "CLONE_VIBE",
             source: sourceText,
-            apiKey: apiKey
+            apiKey: apiKey,
+            model: modelSelect.value
         }, (res) => {
-            if (res && res.success) {
-                customVibeInput.value = res.data.style;
-                selectedVibe = res.data.style;
-                artistInput.value = res.data.artist || "";
-                // Update concept if user left it empty, or just notify
-                if (!conceptInput.value.trim()) conceptInput.value = `Bài hát mang âm hưởng của: ${res.data.artist || 'Unknown'}`;
+            btnCloneVibe.disabled = false;
+            btnCloneVibe.innerText = "DỊCH NGƯỢC STYLE";
 
-                updateLog("> Success: Đã sao chép Vibe thành công!");
+            if (res && res.success) {
+                const decodedStyle = res.data.style;
+                const decodedArtist = res.data.artist || "";
+
+                // Show Result Box
+                const resultBox = document.getElementById('clone-result-box');
+                const resultText = document.getElementById('clone-result-text');
+                resultText.innerText = decodedStyle + (decodedArtist ? ` (Artist: ${decodedArtist})` : "");
+                resultBox.style.display = 'block';
+
+                // Setup Buttons
+                document.getElementById('btn-copy-clone').onclick = () => {
+                    navigator.clipboard.writeText(decodedStyle);
+                    updateLog("> Đã sao chép Style vào bộ nhớ tạm!");
+                };
+
+                document.getElementById('btn-apply-clone').onclick = () => {
+                    customVibeInput.value = decodedStyle;
+                    selectedVibe = decodedStyle;
+                    if (decodedArtist) artistInput.value = decodedArtist;
+
+                    // Match vibe chip or deactivate
+                    let matched = false;
+                    vibeChips.forEach(chip => {
+                        if (chip.dataset.vibe === decodedStyle) {
+                            chip.classList.add('active');
+                            matched = true;
+                        } else {
+                            chip.classList.remove('active');
+                        }
+                    });
+                    if (!matched) customVibeInput.dispatchEvent(new Event('input'));
+
+                    saveState();
+                    updateLog("Đã áp dụng Style vào phần sáng tác!");
+                };
+
+                updateLog("> Success: Đã giải mã DNA bài hát!");
             } else {
                 updateLog("! Error: " + res.error);
             }
@@ -156,14 +268,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const customVibeInput = document.getElementById('custom-vibe-input');
     const vibeChips = document.querySelectorAll('.vibe-chip');
 
-    // New Controls
+    // New Controls (Refactored)
+    const segBtnConcept = document.getElementById('seg-btn-concept');
+    const segBtnLyrics = document.getElementById('seg-btn-lyrics');
+    const segmentedControl = document.querySelector('.mode-segmented-control');
     const inputModeToggle = document.getElementById('input-mode-toggle'); // Checked = Lyrics Mode
     const instrumentalMode = document.getElementById('instrumental-mode');
-    const modeLabelConcept = document.getElementById('mode-concept');
-    const modeLabelLyrics = document.getElementById('mode-lyrics');
 
     // Settings Tab
     const apiKeyInput = document.getElementById('api-key');
+    const modelSelect = document.getElementById('gemini-model');
     const artistInput = document.getElementById('artist-input');
     const genderSelect = document.getElementById('vocal-gender');
     const regionSelect = document.getElementById('vocal-region');
@@ -175,21 +289,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UI LOGIC ---
     function updateInputModeUI() {
-        if (inputModeToggle.checked) {
-            // Lyrics Mode
-            modeLabelLyrics.classList.add('active');
-            modeLabelConcept.classList.remove('active');
+        const isLyrics = inputModeToggle.checked;
+
+        // Update Segmented Control
+        if (isLyrics) {
+            segBtnLyrics.classList.add('active');
+            segBtnConcept.classList.remove('active');
+            segmentedControl.dataset.active = "lyrics";
+        } else {
+            segBtnConcept.classList.add('active');
+            segBtnLyrics.classList.remove('active');
+            segmentedControl.dataset.active = "concept";
+        }
+
+        // Update Labels & Placeholders
+        if (isLyrics) {
             inputLabel.innerText = "LỜI BÀI HÁT (LYRICS)";
             conceptInput.placeholder = "Nhập lời bài hát của bạn vào đây (Verse 1... Chorus...)...";
         } else {
-            // Concept Mode
-            modeLabelConcept.classList.add('active');
-            modeLabelLyrics.classList.remove('active');
             inputLabel.innerText = "KỊCH BẢN (CONCEPT)";
             conceptInput.placeholder = "Ví dụ: Một bài tình ca buồn về mưa, giọng nữ trầm...";
         }
     }
 
+    segBtnConcept.addEventListener('click', () => {
+        inputModeToggle.checked = false;
+        updateInputModeUI();
+        saveState();
+    });
+
+    segBtnLyrics.addEventListener('click', () => {
+        inputModeToggle.checked = true;
+        updateInputModeUI();
+        saveState();
+    });
+
+    // Handle indirect changes (like from analyzed image)
     inputModeToggle.addEventListener('change', updateInputModeUI);
 
     instrumentalMode.addEventListener('change', () => {
@@ -227,13 +362,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    clearStructureBtn.addEventListener('click', () => {
-        currentStructure = [];
-        renderStructure();
-        saveState();
-    });
+    if (clearStructureBtn) {
+        clearStructureBtn.addEventListener('click', () => {
+            currentStructure = [];
+            renderStructure();
+            saveState();
+        });
+    }
 
     function renderStructure() {
+        if (!structureDisplay) return;
         structureDisplay.innerHTML = '';
         if (currentStructure.length === 0) {
             structureDisplay.innerHTML = '<span class="placeholder-text">Chưa chọn cấu trúc...</span>';
@@ -262,24 +400,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             tab.classList.add('active');
             const targetId = `tab-${tab.dataset.tab}`;
-            document.getElementById(targetId).classList.add('active');
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) targetContent.classList.add('active');
+
+            // Synchronize Log with Tab switching
+            const tabNames = {
+                'compose': 'Sáng tác',
+                'history': 'Lịch sử',
+                'settings': 'Cài đặt',
+                'studio': 'Studio'
+            };
+            updateLog(`Chế độ: ${tabNames[tab.dataset.tab] || tab.dataset.tab.toUpperCase()}`);
         });
     });
 
     // --- STATE MANAGEMENT ---
     // Load state
     chrome.storage.local.get([
-        'gemini_api_key', 'saved_concept', 'saved_artist', 'saved_vibe', 'saved_custom_vibe',
+        'gemini_api_key', 'gemini_model', 'saved_concept', 'saved_artist', 'saved_vibe', 'saved_custom_vibe',
         'saved_gender', 'saved_region', 'prompt_history', 'saved_system_prompt', 'saved_structure'
     ], (res) => {
         if (res.gemini_api_key) apiKeyInput.value = res.gemini_api_key;
+        if (res.gemini_model) modelSelect.value = res.gemini_model;
         if (res.saved_concept) conceptInput.value = res.saved_concept;
         if (res.saved_artist) artistInput.value = res.saved_artist;
         if (res.saved_gender) genderSelect.value = res.saved_gender;
         if (res.saved_region) regionSelect.value = res.saved_region;
 
         // Load Advanced Settings
-        if (res.saved_system_prompt) customSystemPromptInput.value = res.saved_system_prompt;
+        if (res.saved_system_prompt && customSystemPromptInput) customSystemPromptInput.value = res.saved_system_prompt;
         if (res.saved_structure) {
             currentStructure = res.saved_structure;
             renderStructure();
@@ -297,10 +446,31 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistory(res.prompt_history || []);
     });
 
+    // --- INITIALIZATION SEQUENCE ---
+    const startupSequence = [
+        "BOOTING VSUNOMAKER OS...",
+        "INITIALIZING AI MODULES...",
+        "SYSTEM CHECK: 100% OK",
+        "Hệ thống đã sẵn sàng..."
+    ];
+
+    let seqIdx = 0;
+    function runStartupSequence() {
+        if (seqIdx < startupSequence.length) {
+            updateLog(startupSequence[seqIdx]);
+            seqIdx++;
+            setTimeout(runStartupSequence, 1200);
+        }
+    }
+
+    // Start sequence
+    runStartupSequence();
+
     // Save state helper
     const saveState = () => {
         chrome.storage.local.set({
             gemini_api_key: apiKeyInput.value.trim(),
+            gemini_model: modelSelect.value,
             saved_concept: conceptInput.value.trim(),
             saved_artist: artistInput.value.trim(),
             saved_vibe: selectedVibe,
@@ -308,14 +478,22 @@ document.addEventListener('DOMContentLoaded', () => {
             saved_gender: genderSelect.value,
             saved_region: regionSelect.value,
             // Save Advanced Settings
-            saved_system_prompt: customSystemPromptInput.value.trim(),
+            saved_system_prompt: customSystemPromptInput ? customSystemPromptInput.value.trim() : "",
             saved_structure: currentStructure
         });
     };
 
     // Events for saving state
-    [conceptInput, apiKeyInput, artistInput, customVibeInput, customSystemPromptInput].forEach(el => el.addEventListener('input', saveState));
-    [genderSelect, regionSelect].forEach(el => el.addEventListener('change', saveState));
+    const inputsToSave = [conceptInput, apiKeyInput, artistInput, customVibeInput];
+    if (customSystemPromptInput) inputsToSave.push(customSystemPromptInput);
+
+    inputsToSave.forEach(el => {
+        if (el) el.addEventListener('input', saveState);
+    });
+
+    [genderSelect, regionSelect, modelSelect].forEach(el => {
+        if (el) el.addEventListener('change', saveState);
+    });
 
 
 
@@ -327,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedVibe = chip.dataset.vibe;
             customVibeInput.value = "";
             saveState();
-            updateLog(`> Vibe switched to: ${selectedVibe}`);
+            updateLog(`Vibe: ${selectedVibe}`);
         });
     });
 
@@ -373,13 +551,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderHistory(history) {
+        if (!historyContainer) return;
         historyContainer.innerHTML = '';
         if (!history || history.length === 0) {
             historyContainer.innerHTML = '<div class="empty-state">Chưa có lịch sử sáng tác.</div>';
             return;
         }
 
-        history.forEach(item => {
+        history.forEach((item, index) => {
             const el = document.createElement('div');
             el.className = 'history-item';
             el.innerHTML = `
@@ -388,14 +567,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>${item.vibe}</span>
                     <span>${item.timestamp.split(' ')[1]}</span> 
                 </div>
+                <button class="delete-history-btn" title="Xóa">×</button>
             `;
-            el.addEventListener('click', () => {
-                // Restore logic
+
+            // Toggle restore logic
+            el.addEventListener('click', (e) => {
+                // If clicked on delete button, do nothing here
+                if (e.target.classList.contains('delete-history-btn')) return;
+
                 conceptInput.value = item.concept;
                 selectedVibe = item.vibe;
                 customVibeInput.value = "";
 
-                // Try to match chip or set custom
                 let matched = false;
                 vibeChips.forEach(chip => {
                     if (chip.dataset.vibe === item.vibe) {
@@ -408,29 +591,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!matched) {
                     customVibeInput.value = item.vibe;
+                    customVibeInput.dispatchEvent(new Event('input'));
                 }
 
                 saveState();
 
-                // Switch back to Compose tab
                 tabs.forEach(t => t.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
-                document.querySelector('[data-tab="compose"]').classList.add('active');
-                document.getElementById('tab-compose').classList.add('active');
+                const composeTabBtn = document.querySelector('[data-tab="compose"]');
+                if (composeTabBtn) composeTabBtn.classList.add('active');
+                const composeTabContent = document.getElementById('tab-compose');
+                if (composeTabContent) composeTabContent.classList.add('active');
 
-                updateLog(`> Restored history item.`);
+                updateLog(`Khôi phục: Mục lịch sử...`);
             });
+
+            // Delete single item logic
+            const deleteBtn = el.querySelector('.delete-history-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                chrome.storage.local.get(['prompt_history'], (res) => {
+                    let h = res.prompt_history || [];
+                    h.splice(index, 1);
+                    chrome.storage.local.set({ prompt_history: h }, () => {
+                        renderHistory(h);
+                        updateLog("Đã xóa 1 mục lịch sử.");
+                    });
+                });
+            });
+
             historyContainer.appendChild(el);
+        });
+    }
+
+    // Clear All History logic
+    const btnClearHistory = document.getElementById('btn-clear-history');
+    if (btnClearHistory) {
+        btnClearHistory.addEventListener('click', () => {
+            if (confirm("Bạn có tin chắc muốn xóa toàn bộ lịch sử không?")) {
+                chrome.storage.local.set({ prompt_history: [] }, () => {
+                    renderHistory([]);
+                    updateLog("Đã dọn sạch lịch sử!");
+                });
+            }
         });
     }
 
 
     // --- INSPECTOR EVENTS ---
-    document.getElementById('inspect-lyrics').addEventListener('click', () => startInspector('lyrics'));
-    document.getElementById('inspect-style').addEventListener('click', () => startInspector('style'));
+    const inspectLyricsBtn = document.getElementById('inspect-lyrics');
+    const inspectStyleBtn = document.getElementById('inspect-style');
+
+    if (inspectLyricsBtn) inspectLyricsBtn.addEventListener('click', () => startInspector('lyrics'));
+    if (inspectStyleBtn) inspectStyleBtn.addEventListener('click', () => startInspector('style'));
 
     async function startInspector(type) {
-        updateLog(`> Studio: Đang soi vùng ${type.toUpperCase()}...`);
+        updateLog(`Studio: Đang soi vùng ${type.toUpperCase()}...`);
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab) chrome.tabs.sendMessage(tab.id, { action: "START_INSPECTOR", targetType: type });
         // Don't close popup in Side Panel mode
@@ -448,14 +664,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const isCustomLyrics = inputModeToggle.checked;
 
         if (!inputText || !apiKey) {
-            updateLog("! Error: Vui lòng nhập nội dung và API Key.");
+            updateLog("Lỗi: Vui lòng nhập nội dung và API Key.");
             if (!apiKey) {
-                document.querySelector('[data-tab="settings"]').click();
+                const settingsTabBtn = document.querySelector('[data-tab="settings"]');
+                if (settingsTabBtn) settingsTabBtn.click();
             }
             return;
         }
 
-        updateLog("> Connecting to Gemini Deep Music AI...");
+        updateLog("Kết nối: Gemini Deep Music AI...");
         composeBtn.disabled = true;
         composeBtn.innerText = "ĐANG SÁNG TÁC...";
 
@@ -474,10 +691,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 gender: gender,
                 region: region,
                 apiKey: apiKey,
+                model: modelSelect.value,
                 isInstrumental: isInstrumental,
                 isCustomLyrics: isCustomLyrics,
-                customSystemPrompt: customSystemPromptInput.value.trim(),
-                customStructure: currentStructure.join(', ')
+                customSystemPrompt: customSystemPromptInput ? customSystemPromptInput.value.trim() : "",
+                customStructure: currentStructure.join(', '),
+                vocalTraits: Array.from(document.querySelectorAll('#vocal-traits .pro-chip.active')).map(c => c.dataset.val),
+                vocalPresets: Array.from(document.querySelectorAll('#vocal-presets .pro-chip.active')).map(c => c.dataset.val),
+                emotions: Array.from(document.querySelectorAll('#emotion-chips .pro-chip.active')).map(c => c.dataset.val)
             }, async (aiResponse) => {
                 if (!aiResponse || !aiResponse.success) {
                     updateLog("! AI Error: " + (aiResponse ? aiResponse.error : "Unknown"));
@@ -489,8 +710,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 addToHistory(inputText, selectedVibe);
 
                 const masterpieceData = aiResponse.data;
-                updateLog("> AI Composer: Kiệt tác đã sẵn sàng.");
-                updateLog("> Injecting to Suno UI...");
+                updateLog("AI Composer: Kiệt tác đã sẵn sàng.");
+                updateLog("Đang nạp vào giao diện Suno...");
 
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -508,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateLog("! Lỗi: Hãy F5 (Refresh) trang Suno.");
                         console.error("Conn err:", chrome.runtime.lastError.message);
                     } else if (injectResponse && injectResponse.success) {
-                        updateLog("> SUCCESS: Kiệt tác đã được điền!");
+                        updateLog("SUCCESS: Kiệt tác đã được điền!");
                     } else {
                         updateLog("! Failed: Hãy bật 'Custom Mode' trên Suno.");
                     }
@@ -527,11 +748,87 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function updateLog(msg) {
-        statusLog.innerText = msg;
+        if (!statusLog) return;
+
+        // Clear previous timer
+        if (typingTimer) clearInterval(typingTimer);
+
+        statusLog.innerText = "";
+        let i = 0;
+        typingTimer = setInterval(() => {
+            if (i < msg.length) {
+                statusLog.innerText += msg.charAt(i);
+                i++;
+            } else {
+                clearInterval(typingTimer);
+            }
+        }, 30); // Speed of typing
     }
 
     function resetBtn() {
-        composeBtn.disabled = false;
-        composeBtn.innerText = "TẠO HIT NGAY";
+        if (composeBtn) {
+            composeBtn.disabled = false;
+            composeBtn.innerText = "TẠO HIT NGAY";
+        }
     }
+
+    // --- PREMIUM ACCORDION SYSTEM ---
+    document.querySelectorAll('.studio-accordion').forEach(accordion => {
+        const header = accordion.querySelector('.accordion-header');
+        if (header) {
+            header.addEventListener('click', () => {
+                const isExpanded = accordion.classList.contains('expanded');
+
+                if (isExpanded) {
+                    accordion.classList.remove('expanded');
+                } else {
+                    accordion.classList.add('expanded');
+                }
+            });
+        }
+    });
+
+    // --- STUDIO SUB-TABS LOGIC ---
+    const subTabBtns = document.querySelectorAll('.sub-tab-btn');
+    const subTabContents = document.querySelectorAll('.sub-tab-content');
+
+    subTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetSubTab = btn.dataset.subtab;
+
+            // Update UI buttons
+            subTabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update UI content
+            subTabContents.forEach(content => {
+                const contentId = content.id;
+                if (contentId === `studio-${targetSubTab}-content`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+
+            updateLog(`Studio: Chế độ ${targetSubTab === 'basic' ? 'Cơ bản' : 'Nâng cao'}`);
+        });
+    });
+
+    // --- PRO FEATURES CHIPS LOGIC ---
+    function setupMultiSelectChips(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const chips = container.querySelectorAll('.pro-chip');
+        chips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('active');
+                saveState();
+            });
+        });
+    }
+
+    setupMultiSelectChips('vocal-traits');
+    setupMultiSelectChips('vocal-presets');
+    setupMultiSelectChips('emotion-chips');
 });
