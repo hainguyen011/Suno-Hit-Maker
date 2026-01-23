@@ -61,25 +61,55 @@
                         </div>
                     </div>
 
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <label style="margin-bottom: 0;" id="input-label">Ý TƯỞNG (CONCEPT)</label>
-                        <div class="inspector-tools">
-                            <button class="icon-btn" id="magic-polish" title="✨ Sửa lời vần điệu (Magic Polish)">✨
-                                P</button>
-                            <button class="icon-btn" id="inspect-lyrics" title="Scan vùng Lyrics">Lyrics</button>
-                            <button class="icon-btn" id="inspect-style" title="Scan vùng Style">Styles</button>
-                        </div>
+
+
+                    <div class="inspector-tools" style="margin-bottom: 10px; display: flex; gap: 8px;">
+                        <!-- <button class="icon-btn" id="preview-lyrics" title="👁️ Xem trước (Preview Rendered)">Xem
+                            trước</button> -->
+                        <button class="icon-btn" id="magic-polish" title="Sửa lời vần điệu (Magic Polish)">Sửa lời
+                            nhạc</button>
+                        <button class="icon-btn" id="inspect-lyrics" title="Scan vùng Lyrics">Lyrics</button>
+                        <button class="icon-btn" id="inspect-style" title="Scan vùng Style">Styles</button>
                     </div>
-                    <textarea id="lyrics-input"
-                        placeholder="Ví dụ: Một bài ballad V-pop tâm trạng, nói về sự nuối tiếc trong những đêm mưa..."
-                        style="text-align: left; min-height: 350px;"></textarea>
+
+                    <div class="lyrics-container-wrapper">
+                        <label style="margin-bottom: 12px; display: block;" id="input-label" class="absolute-label">Ý
+                            TƯỞNG (CONCEPT)</label>
+                        <textarea id="lyrics-input"
+                            placeholder="Ví dụ: Một bài ballad V-pop tâm trạng, nói về sự nuối tiếc trong những đêm mưa..."
+                            style="text-align: left; min-height: 350px; padding-top: 50px;"></textarea>
+                        <div id="lyrics-render-preview" class="lyrics-render-preview" style="display: none;"></div>
+                    </div>
 
                     <label>NGHỆ SĨ TRUYỀN CẢM HỨNG</label>
                     <input type="text" id="artist-input" placeholder="Ví dụ: Sơn Tùng M-TP..."
                         style="color: white; margin-bottom: 20px; ">
 
                     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <div style="flex: 1;">
+                            <label>NGÔN NGỮ</label>
+                            <select id="vocal-language"
+                                style="width: 100%; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 0.85rem; outline: none;">
+                                <option value="Vietnamese">Tiếng Việt</option>
+                                <option value="English">Tiếng Anh</option>
+                                <option value="Korean">Tiếng Hàn</option>
+                                <option value="Japanese">Tiếng Nhật</option>
+                                <option value="Chinese">Tiếng Trung</option>
+                                <option value="Thai">Tiếng Thái</option>
+                                <option value="French">Tiếng Pháp</option>
+                                <option value="Spanish">Tiếng Tây Ban Nha</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;" id="region-container">
+                            <label>VÙNG MIỀN</label>
+                            <select id="vocal-region"
+                                style="width: 100%; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 0.85rem; outline: none;">
+                                <option value="Standard">Chuẩn</option>
+                                <option value="Northern">Miền Bắc</option>
+                                <option value="Central">Miền Trung</option>
+                                <option value="Southern">Miền Nam</option>
+                            </select>
+                        </div>
                         <div style="flex: 1;">
                             <label>GIỚI TÍNH (VOCAL)</label>
                             <select id="vocal-gender"
@@ -88,16 +118,6 @@
                                 <option value="Male Vocals">Nam (Male)</option>
                                 <option value="Female Vocals">Nữ (Female)</option>
                                 <option value="Duet Vocals">Song ca (Duet)</option>
-                            </select>
-                        </div>
-                        <div style="flex: 1;">
-                            <label>VÙNG MIỀN</label>
-                            <select id="vocal-region"
-                                style="width: 100%; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 0.85rem; outline: none;">
-                                <option value="Standard">Chuẩn</option>
-                                <option value="Northern">Miền Bắc</option>
-                                <option value="Central">Miền Trung</option>
-                                <option value="Southern">Miền Nam</option>
                             </select>
                         </div>
                     </div>
@@ -114,7 +134,12 @@
                     </div>
 
                     <div class="input-panel custom-vibe-panel">
-                        <label>VIBE TÙY CHỈNH (CUSTOM)</label>
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <label style="margin-bottom: 0;">VIBE TÙY CHỈNH (CUSTOM)</label>
+                            <button id="auto-style-btn" class="mini-auto-btn"
+                                title="🤖 Tự động tạo Style dựa trên nội dung">Auto</button>
+                        </div>
                         <input type="text" id="custom-vibe-input" placeholder="Ví dụ: Bolero, Jazz, Funk...">
                     </div>
                 </div>
@@ -182,13 +207,16 @@
                     <label>PHIÊN BẢN MÔ HÌNH (MODEL)</label>
                     <select id="gemini-model"
                         style="width: 100%; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 0.85rem; outline: none;">
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ổn định)</option>
-                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                        <option value="gemini-2.0-flash-exp" selected>Gemini 2.0 Flash (Mặc định)</option>
+                        <!-- Gemini 2.5 -->
                         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+
+                        <!-- Gemini 3.0 -->
                         <option value="gemini-3.0-flash">Gemini 3.0 Flash</option>
                         <option value="gemini-3.0-pro">Gemini 3.0 Pro</option>
+                        <option value="gemini-3.0-pro-deep-think">Gemini 3.0 Pro Deep Think</option>
+
                     </select>
                 </div>
 
@@ -391,10 +419,61 @@
             </div>
         </div>
 
+        <!-- REVIEW MODAL (Lyrics Polish Review) -->
+        <div id="polish-review-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        BẢN CHỈNH SỬA
+                    </div>
+                    <button class="modal-close" id="close-review">×</button>
+                </div>
+                <div class="modal-body">
+                    <p class="review-intro">Hãy duyệt qua các đề xuất thay đổi để bài hát trôi chảy hơn.</p>
+                    <div id="review-list" class="review-list">
+                        <!-- Review items will be injected here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="apply-all-review" class="glow-button">ÁP DỤNG TẤT CẢ</button>
+                    <button id="discard-all-review" class="ghost-btn">BỎ QUA TẤT CẢ</button>
+                </div>
+            </div>
+        </div>
+
         <footer>
             <span>AI MUSIC ENGINE v1.0</span>
             <span id="ai-status">ONLINE</span>
         </footer>
+    </div>
+
+    <!-- Modal: Work Details -->
+    <div id="work-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i data-lucide="music"></i>
+                    <span>CHI TIẾT TÁC PHẨM</span>
+                </div>
+                <button class="close-modal" id="close-work-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="work-detail-section">
+                    <label>Ý TƯỞNG (CONCEPT)</label>
+                    <div id="work-modal-concept" class="lyrics-preview"></div>
+                </div>
+                <div class="work-detail-section">
+                    <label>LỜI BÀI HÁT (LYRICS)</label>
+                    <div id="work-modal-lyrics" class="lyrics-preview"></div>
+                </div>
+                <div class="work-detail-meta" id="work-modal-meta">
+                    <!-- Meta tags will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border);">
+                <button class="glow-button" id="work-modal-reuse" style="width: 100%;">SỬ DỤNG LẠI</button>
+            </div>
+        </div>
     </div>
     <script src="popup.js"></script>
 </body>

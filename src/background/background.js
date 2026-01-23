@@ -18,9 +18,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // 2. Polish Lyrics
     if (request.action === "POLISH_LYRICS") {
-        const prompt = Prompts.polishLyrics(request.lyrics);
+        const prompt = Prompts.polishLyrics(request.params);
         callGemini(prompt, request.apiKey, request.model)
             .then(data => sendResponse({ success: true, data: data }))
+            .catch(err => sendResponse({ success: false, error: err.message }));
+        return true;
+    }
+
+    // 2.5. Regenerate Review Item
+    if (request.action === "REGENERATE_REVIEW_ITEM") {
+        const prompt = Prompts.regenerateReviewItem(request.params);
+        callGemini(prompt, request.apiKey, request.model)
+            .then(data => {
+                const jsonMatch = data.match(/\{[\s\S]*?\}/);
+                const result = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Parse error" };
+                sendResponse({ success: true, data: result });
+            })
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
     }
@@ -64,6 +77,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     sendResponse({ success: true, data: { description: text, vibe: "Cinematic" } });
                 }
             })
+            .catch(err => sendResponse({ success: false, error: err.message }));
+        return true;
+    }
+
+    // 5.5. Generate Styles (Pro)
+    if (request.action === "GENERATE_STYLES") {
+        const prompt = Prompts.generateStyles(request.params);
+        callGemini(prompt, request.apiKey, request.model)
+            .then(data => sendResponse({ success: true, data: data }))
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
     }

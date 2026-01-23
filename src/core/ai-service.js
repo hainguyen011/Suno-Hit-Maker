@@ -3,8 +3,8 @@
  * Handles communication with Gemini API
  */
 
-export async function callGemini(promptText, apiKey, model = "gemini-2.0-flash-exp") {
-    // Note: Use 2.0-flash-exp for best performance/cost
+export async function callGemini(promptText, apiKey, model = "gemini-2.5-flash") {
+    // Note: Use 2.5-flash for best performance/cost
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
@@ -36,7 +36,7 @@ export async function callGemini(promptText, apiKey, model = "gemini-2.0-flash-e
     }
 }
 
-export async function callGeminiVision(base64Image, apiKey, model = "gemini-1.5-flash") {
+export async function callGeminiVision(base64Image, apiKey, model = "gemini-2.5-flash") {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const payload = {

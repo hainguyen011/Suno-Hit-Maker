@@ -18,9 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const cloneInput = document.getElementById('clone-input');
     const btnCloneVibe = document.getElementById('btn-clone-vibe');
 
+    const languageSelect = document.getElementById('vocal-language');
+    const regionContainer = document.getElementById('region-container');
+    const autoStyleBtn = document.getElementById('auto-style-btn');
+
     // 1. Magic Polish (Lyrics)
     if (magicPolishBtn) {
         magicPolishBtn.addEventListener('click', () => {
+            // Restriction: Only work in Lyrics mode
+            if (!inputModeToggle.checked) {
+                updateLog("⚠️ Tính năng này chỉ khả dụng trong chế độ LỜI NHẠC.");
+                return;
+            }
+
             const lyrics = conceptInput.value.trim();
             const apiKey = apiKeyInput.value.trim();
             if (!lyrics || !apiKey) {
@@ -29,23 +39,177 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             updateLog("Magic Polisher: Đang phân tích vần điệu...");
+            magicPolishBtn.disabled = true;
+            magicPolishBtn.innerText = "ĐANG PHÂN TÍCH...";
 
             chrome.runtime.sendMessage({
                 action: "POLISH_LYRICS",
-                lyrics: lyrics,
+                params: {
+                    lyrics: lyrics,
+                    vibe: selectedVibe,
+                    artist: artistInput.value.trim(),
+                    language: languageSelect.value,
+                    region: regionSelect.value
+                },
                 apiKey: apiKey,
                 model: modelSelect.value
             }, (response) => {
+                magicPolishBtn.disabled = false;
+                magicPolishBtn.innerText = "Sửa lời nhạc";
+
                 if (response && response.success) {
-                    // Clean markdown if AI returns it
-                    let cleanedData = response.data.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
-                    conceptInput.value = cleanedData;
-                    updateLog("> Success: Lời bài hát đã được chuốt lại!");
+                    try {
+                        const jsonMatch = response.data.match(/\[[\s\S]*\]/);
+                        if (!jsonMatch) throw new Error("AI không trả về đúng định dạng JSON.");
+                        const suggestions = JSON.parse(jsonMatch[0]);
+                        showPolishReview(suggestions);
+                        updateLog("> Success: Đã tìm thấy các đề xuất sửa vần!");
+                    } catch (e) {
+                        updateLog("Lỗi: Không thể phân tích kết quả từ AI.");
+                        console.error("Parse error:", e);
+                    }
                 } else {
                     updateLog("Lỗi: " + (response.error || "Unknown"));
                 }
             });
         });
+    }
+
+    // --- POLISH REVIEW LOGIC ---
+    const reviewModal = document.getElementById('polish-review-modal');
+    const reviewList = document.getElementById('review-list');
+    const closeReviewBtn = document.getElementById('close-review');
+    const applyAllBtn = document.getElementById('apply-all-review');
+    const discardAllBtn = document.getElementById('discard-all-review');
+    let currentSuggestions = [];
+
+    function showPolishReview(suggestions) {
+        currentSuggestions = suggestions;
+        reviewList.innerHTML = '';
+
+        suggestions.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'review-item';
+
+            // Score color logic
+            let scoreColor = '#fffa82'; // Yellow for mid
+            if (item.improvementScore > 80) scoreColor = '#50ff7b'; // Green for high
+            if (item.improvementScore < 50) scoreColor = '#ff5f5f'; // Red for low
+
+            card.innerHTML = `
+                <div class="review-diff-box">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span class="improvement-badge" style="background: ${scoreColor}22; color: ${scoreColor}; border: 1px solid ${scoreColor}55;">
+                            +${item.improvementScore}% Better
+                        </span>
+                    </div>
+                    <div class="diff-original">${renderMarkdown(item.original)}</div>
+                    <div class="diff-suggested">${renderMarkdown(item.suggested)}</div>
+                </div>
+                <div class="review-reason">${renderMarkdown(item.reason)}</div>
+                <div class="review-action-bar">
+                    <button class="mini-btn ghost-btn regen-btn" data-index="${index}" title="Thử phương án khác">
+                        <i data-lucide="rotate-cw"></i>
+                    </button>
+                    <button class="mini-btn apply-btn" data-index="${index}">Dùng</button>
+                </div>
+            `;
+
+            card.querySelector('.apply-btn').onclick = () => {
+                applySingleReview(item.original, item.suggested);
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+            };
+
+            card.querySelector('.regen-btn').onclick = (e) => {
+                const btn = e.currentTarget;
+                const originalText = item.original;
+                const currentSuggested = item.suggested;
+
+                btn.disabled = true;
+                btn.classList.add('spinning');
+                card.style.opacity = '0.7';
+
+                chrome.runtime.sendMessage({
+                    action: "REGENERATE_REVIEW_ITEM",
+                    params: {
+                        original: originalText,
+                        currentSuggested: currentSuggested,
+                        vibe: selectedVibe,
+                        artist: artistInput.value.trim(),
+                        language: languageSelect.value,
+                        region: regionSelect.value
+                    },
+                    apiKey: apiKeyInput.value.trim(),
+                    model: modelSelect.value
+                }, (response) => {
+                    btn.disabled = false;
+                    btn.classList.remove('spinning');
+                    card.style.opacity = '1';
+
+                    if (response && response.success) {
+                        const newData = response.data;
+                        item.suggested = newData.suggested;
+                        item.reason = newData.reason;
+                        item.improvementScore = newData.improvementScore;
+
+                        // Update UI of the card
+                        card.querySelector('.diff-suggested').innerHTML = renderMarkdown(newData.suggested);
+                        card.querySelector('.review-reason').innerHTML = renderMarkdown(newData.reason);
+
+                        const badge = card.querySelector('.improvement-badge');
+                        badge.textContent = `+${newData.improvementScore}% Better`;
+
+                        // Update score color
+                        let scoreColor = '#fffa82';
+                        if (newData.improvementScore > 80) scoreColor = '#50ff7b';
+                        if (newData.improvementScore < 50) scoreColor = '#ff5f5f';
+                        badge.style.background = scoreColor + '22';
+                        badge.style.color = scoreColor;
+                        badge.style.border = '1px solid ' + scoreColor + '55';
+                    }
+                });
+            };
+
+            reviewList.appendChild(card);
+        });
+
+        reviewModal.style.display = 'flex';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function applySingleReview(original, suggested) {
+        let text = conceptInput.value;
+        if (text.includes(original)) {
+            text = text.replace(original, suggested);
+            conceptInput.value = text;
+            saveState();
+        }
+    }
+
+    if (closeReviewBtn) closeReviewBtn.onclick = () => reviewModal.style.display = 'none';
+    if (discardAllBtn) discardAllBtn.onclick = () => reviewModal.style.display = 'none';
+
+    if (applyAllBtn) {
+        applyAllBtn.onclick = () => {
+            let text = conceptInput.value;
+            currentSuggestions.forEach(item => {
+                if (text.includes(item.original)) {
+                    text = text.replace(item.original, item.suggested);
+                }
+            });
+            conceptInput.value = text;
+            saveState();
+
+            // SAVE TO HISTORY as Polish version
+            addToHistory(text, selectedVibe, 'polish', {
+                suggestionsCount: currentSuggestions.length,
+                originalVibe: selectedVibe
+            });
+
+            reviewModal.style.display = 'none';
+            updateLog("> Success: Đã áp dụng & lưu vào lịch sử chỉnh sửa!");
+        };
     }
 
     // 2. See The Sound (Image Upload)
@@ -258,6 +422,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // 5. Auto Generate Style
+    if (autoStyleBtn) {
+        autoStyleBtn.addEventListener('click', () => {
+            const concept = conceptInput.value.trim();
+            const language = languageSelect ? languageSelect.value : "Vietnamese";
+            const artist = artistInput.value.trim();
+            const gender = genderSelect.value;
+            const region = regionSelect.value;
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!concept || !apiKey) {
+                updateLog("! Error: Cần Ý tưởng/Lời nhạc và API Key.");
+                return;
+            }
+
+            updateLog("Studio Producer: Đang phân tích và tạo Style...");
+            autoStyleBtn.disabled = true;
+            autoStyleBtn.innerText = "ĐANG TẠO...";
+
+            chrome.runtime.sendMessage({
+                action: "GENERATE_STYLES",
+                apiKey: apiKey,
+                model: modelSelect.value,
+                params: {
+                    concept: concept,
+                    language: language,
+                    artist: artist,
+                    gender: gender,
+                    region: region
+                }
+            }, (res) => {
+                autoStyleBtn.disabled = false;
+                autoStyleBtn.innerText = "AUTO";
+
+                if (res && res.success) {
+                    customVibeInput.value = res.data;
+                    selectedVibe = res.data;
+                    vibeChips.forEach(c => c.classList.remove('active'));
+                    saveState();
+                    updateLog("> Success: Style đã được tối ưu hóa!");
+                } else {
+                    updateLog("! Error: " + res.error);
+                }
+            });
+        });
+    }
+
 
 
     // Compose Tab
@@ -274,6 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const segmentedControl = document.querySelector('.mode-segmented-control');
     const inputModeToggle = document.getElementById('input-mode-toggle'); // Checked = Lyrics Mode
     const instrumentalMode = document.getElementById('instrumental-mode');
+    const previewLyricsBtn = document.getElementById('preview-lyrics');
+    const lyricsRenderPreview = document.getElementById('lyrics-render-preview');
+
+    // Work Modal
+    const workModal = document.getElementById('work-modal');
+    const closeWorkModalBtn = document.getElementById('close-work-modal');
+    const workModalConcept = document.getElementById('work-modal-concept');
+    const workModalLyrics = document.getElementById('work-modal-lyrics');
+    const workModalMeta = document.getElementById('work-modal-meta');
+    const workModalReuseBtn = document.getElementById('work-modal-reuse');
+    let currentWorkForModal = null;
 
     // Settings Tab
     const apiKeyInput = document.getElementById('api-key');
@@ -281,6 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const artistInput = document.getElementById('artist-input');
     const genderSelect = document.getElementById('vocal-gender');
     const regionSelect = document.getElementById('vocal-region');
+    const languageSelectElement = document.getElementById('vocal-language'); // Local reference if needed
+    const regionContainerElement = document.getElementById('region-container');
 
     // History Tab
     const historyContainer = document.getElementById('history-container');
@@ -326,6 +550,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle indirect changes (like from analyzed image)
     inputModeToggle.addEventListener('change', updateInputModeUI);
+
+    // --- PREVIEW LOGIC ---
+    if (previewLyricsBtn) {
+        previewLyricsBtn.addEventListener('click', () => {
+            const isPreviewing = previewLyricsBtn.classList.toggle('active');
+
+            if (isPreviewing) {
+                // Swith to Preview
+                const lyrics = conceptInput.value;
+                lyricsRenderPreview.innerHTML = renderMarkdown(lyrics);
+                conceptInput.style.display = 'none';
+                lyricsRenderPreview.style.display = 'block';
+                previewLyricsBtn.innerHTML = 'Thoát';
+                updateLog("Chế độ xem trước: Vần điệu đã được render.");
+            } else {
+                // Switch back to Edit
+                conceptInput.style.display = 'block';
+                lyricsRenderPreview.style.display = 'none';
+                previewLyricsBtn.innerHTML = 'Xem trước';
+                updateLog("Về chế độ soạn thảo.");
+            }
+        });
+    }
 
     instrumentalMode.addEventListener('change', () => {
         if (instrumentalMode.checked) {
@@ -432,6 +679,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res.saved_artist) artistInput.value = res.saved_artist;
         if (res.saved_gender) genderSelect.value = res.saved_gender;
         if (res.saved_region) regionSelect.value = res.saved_region;
+        if (res.saved_language && languageSelect) {
+            languageSelect.value = res.saved_language;
+            // Initial check for region visibility
+            if (languageSelect.value === 'Vietnamese') {
+                regionContainer.style.display = 'block';
+            } else {
+                regionContainer.style.display = 'none';
+            }
+        }
 
         // Load Advanced Settings
         if (res.saved_system_prompt && customSystemPromptInput) customSystemPromptInput.value = res.saved_system_prompt;
@@ -483,6 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saved_custom_vibe: customVibeInput.value.trim(),
             saved_gender: genderSelect.value,
             saved_region: regionSelect.value,
+            saved_language: languageSelect ? languageSelect.value : "Vietnamese",
             // Save Advanced Settings
             saved_system_prompt: customSystemPromptInput ? customSystemPromptInput.value.trim() : "",
             saved_structure: currentStructure
@@ -497,7 +754,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.addEventListener('input', saveState);
     });
 
-    [genderSelect, regionSelect, modelSelect].forEach(el => {
+    if (languageSelect) {
+        languageSelect.addEventListener('change', () => {
+            if (languageSelect.value === 'Vietnamese') {
+                regionContainer.style.display = 'block';
+            } else {
+                regionContainer.style.display = 'none';
+                regionSelect.value = 'Standard';
+            }
+            saveState();
+        });
+    }
+
+    [genderSelect, regionSelect, modelSelect, languageSelect].forEach(el => {
         if (el) el.addEventListener('change', saveState);
     });
 
@@ -537,13 +806,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- HISTORY LOGIC ---
-    function addToHistory(concept, vibe) {
+    function addToHistory(concept, vibe, type = 'compose', meta = null) {
         chrome.storage.local.get(['prompt_history'], (res) => {
             let history = res.prompt_history || [];
             const newItem = {
                 id: Date.now(),
                 concept: concept,
                 vibe: vibe,
+                type: type,
+                meta: meta,
                 timestamp: new Date().toLocaleString('vi-VN')
             };
 
@@ -567,23 +838,35 @@ document.addEventListener('DOMContentLoaded', () => {
         history.forEach((item, index) => {
             const el = document.createElement('div');
             el.className = 'history-item';
+            const isPolish = item.type === 'polish';
             el.innerHTML = `
-                <div class="history-concept">${item.concept}</div>
-                <div class="history-meta">
-                    <span>${item.vibe}</span>
-                    <span>${item.timestamp.split(' ')[1]}</span> 
+                <div class="history-item-main">
+                    <div class="history-concept">${renderMarkdown(item.concept)}</div>
+                    <div class="history-meta">
+                        ${isPolish ? '<span class="history-tag polish">CHỈNH SỬA</span>' : '<span class="history-tag compose">SÁNG TÁC</span>'}
+                        <span class="vibe-tag">${item.vibe}</span>
+                        <span>${item.timestamp.split(' ')[1]}</span> 
+                    </div>
                 </div>
-                <button class="delete-history-btn" title="Xóa">×</button>
+                <div class="history-actions">
+                    <button class="history-action-btn continue-btn" title="Tiếp tục chỉnh sửa">
+                        <i data-lucide="pencil-line"></i>
+                    </button>
+                    <button class="delete-history-btn" title="Xóa">×</button>
+                </div>
             `;
 
-            // Toggle restore logic
-            el.addEventListener('click', (e) => {
-                // If clicked on delete button, do nothing here
-                if (e.target.classList.contains('delete-history-btn')) return;
-
+            // Continue Editing / Restore logic
+            const restoreAction = () => {
                 conceptInput.value = item.concept;
                 selectedVibe = item.vibe;
                 customVibeInput.value = "";
+
+                // If it's a polish item, auto-switch to LYRICS mode
+                if (isPolish && !inputModeToggle.checked) {
+                    inputModeToggle.checked = true;
+                    inputModeToggle.dispatchEvent(new Event('change'));
+                }
 
                 let matched = false;
                 vibeChips.forEach(chip => {
@@ -597,7 +880,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!matched) {
                     customVibeInput.value = item.vibe;
-                    customVibeInput.dispatchEvent(new Event('input'));
                 }
 
                 saveState();
@@ -609,8 +891,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const composeTabContent = document.getElementById('tab-compose');
                 if (composeTabContent) composeTabContent.classList.add('active');
 
-                updateLog(`Khôi phục: Mục lịch sử...`);
+                updateLog(`Khôi phục: ${isPolish ? 'Bản chỉnh sửa' : 'Ý tưởng sáng tác'}...`);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.delete-history-btn')) return;
+                restoreAction();
             });
+
+            const continueBtn = el.querySelector('.continue-btn');
+            if (continueBtn) continueBtn.onclick = (e) => {
+                e.stopPropagation();
+                restoreAction();
+            };
 
             // Delete single item logic
             const deleteBtn = el.querySelector('.delete-history-btn');
@@ -628,6 +922,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             historyContainer.appendChild(el);
         });
+
+        // Re-render icons for dynamic content
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     // Clear All History logic
@@ -724,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 artist: artist,
                 gender: gender,
                 region: region,
+                language: languageSelect ? languageSelect.value : "Vietnamese",
                 apiKey: apiKey,
                 model: modelSelect.value,
                 isInstrumental: isInstrumental,
@@ -959,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${work.sunoId ? `<span class="work-tag">✅ Suno</span>` : ''}
                 </div>
                 
-                <div class="work-concept">${escapeHtml(work.concept)}</div>
+                <div class="work-concept">${renderMarkdown(work.concept)}</div>
                 
                 <div class="work-actions">
                     <button class="work-action-btn view-btn" data-index="${index}">👁️ Chi tiết</button>
@@ -1014,35 +1314,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showWorkDetails(work) {
-        const details = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 THÔNG TIN TÁC PHẨM
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        currentWorkForModal = work;
 
-${work.title ? `🎵 Tiêu đề: ${work.title}\n` : ''}
-${work.sunoId ? `🆔 Suno ID: ${work.sunoId}\n` : ''}
-${work.sunoUrl ? `🔗 Link: ${work.sunoUrl}\n` : ''}
+        // Populate modal
+        workModalConcept.innerHTML = renderMarkdown(work.concept || "Không có nội dung.");
+        workModalLyrics.innerHTML = work.lyrics ? renderMarkdown(work.lyrics) : `<div class="empty-state" style="padding: 10px;">Chưa có lời bài hát chi tiết.</div>`;
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚙️ CÀI ĐẶT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // Metadata chips
+        workModalMeta.innerHTML = `
+            <div class="meta-tag">🎵 ${work.vibe || 'N/A'}</div>
+            <div class="meta-tag">🎤 ${work.gender || 'N/A'}</div>
+            <div class="meta-tag">🌍 ${work.region || 'N/A'}</div>
+            ${work.artist ? `<div class="meta-tag">🎨 ${work.artist}</div>` : ''}
+            ${work.sunoId ? `<div class="meta-tag">🆔 ${work.sunoId}</div>` : ''}
+        `;
 
-🎵 Vibe: ${work.vibe || 'N/A'}
-🎤 Giọng: ${work.gender || 'N/A'}
-🌍 Vùng: ${work.region || 'N/A'}
-🎨 Nghệ sĩ: ${work.artist || 'N/A'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📄 NỘI DUNG
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${work.concept}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        `.trim();
-
-        alert(details);
+        // Show modal
+        workModal.classList.add('active');
+        updateLog(`Đang xem: ${work.title || 'Tác phẩm'}`);
     }
+
+    // Modal Events
+    if (closeWorkModalBtn) {
+        closeWorkModalBtn.addEventListener('click', () => {
+            workModal.classList.remove('active');
+        });
+    }
+
+    if (workModalReuseBtn) {
+        workModalReuseBtn.addEventListener('click', () => {
+            if (currentWorkForModal) {
+                reuseWork(currentWorkForModal);
+                workModal.classList.remove('active');
+            }
+        });
+    }
+
+    // Close modal on click outside
+    workModal.addEventListener('click', (e) => {
+        if (e.target === workModal) {
+            workModal.classList.remove('active');
+        }
+    });
 
     function reuseWork(work) {
         // Populate compose form with work data
@@ -1092,6 +1405,23 @@ ${work.concept}
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // NEW: Simple Markdown/Lyrics Renderer
+    function renderMarkdown(text) {
+        if (!text) return '';
+        let html = escapeHtml(text);
+
+        // Bold: **text**
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Italic: *text* (optional)
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        // New lines: replace with <br>
+        html = html.replace(/\n/g, '<br>');
+
+        return html;
     }
 
     // Initialize Lucide icons
