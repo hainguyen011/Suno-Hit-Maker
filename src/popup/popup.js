@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const languageSelect = document.getElementById('vocal-language');
     const regionContainer = document.getElementById('region-container');
     const autoStyleBtn = document.getElementById('auto-style-btn');
+    const musicFocusSelect = document.getElementById('music-focus');
 
     // 1. Magic Polish (Lyrics)
     if (magicPolishBtn) {
@@ -709,25 +710,257 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
+
+
     // Advanced Tab
     const customSystemPromptInput = document.getElementById('custom-system-prompt');
     const structureDisplay = document.getElementById('structure-display');
-    const structureBtns = document.querySelectorAll('.struct-btn:not(.clear-btn)');
     const clearStructureBtn = document.getElementById('clear-structure');
 
     let currentStructure = [];
 
-    // --- ADVANCED TAB LOGIC ---
-    // Structure Builder
-    structureBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const part = btn.dataset.part;
-            currentStructure.push(part);
-            renderStructure();
-            saveState();
-        });
-    });
+    // ==================== PROFESSIONAL HIERARCHICAL STRUCTURE SYSTEM ====================
 
+    // Structure Categories with 40+ Variants
+    const STRUCTURE_CATEGORIES = {
+        "Intro": {
+            icon: "",
+            color: "#3b82f6",
+            variants: [
+                { id: "intro", name: "Intro", description: "Phần mở đầu chuẩn, tạo không khí cho bài hát", duration: "4-8 bars" },
+                { id: "intro-instrumental", name: "Intro (Instrumental)", description: "Mở đầu không lời, chỉ nhạc cụ", duration: "4-8 bars" },
+                { id: "intro-spoken", name: "Intro (Spoken Word)", description: "Mở đầu bằng lời nói", duration: "4-8 bars" },
+                { id: "intro-dialogue", name: "Intro (Dialogue)", description: "Mở đầu bằng đoạn hội thoại", duration: "4-8 bars" },
+                { id: "intro-ambient", name: "Intro (Ambient / FX)", description: "Mở đầu với âm thanh môi trường/hiệu ứng", duration: "4-8 bars" },
+                { id: "intro-vocal-chop", name: "Intro (Vocal Chop)", description: "Mở đầu với vocal chops", duration: "4-8 bars" }
+            ]
+        },
+        "Verse": {
+            icon: "",
+            color: "#8b5cf6",
+            variants: [
+                { id: "verse", name: "Verse", description: "Phần kể chuyện chuẩn, phát triển nội dung", duration: "8-16 bars" },
+                { id: "verse-narrative", name: "Verse (Narrative / Storytelling)", description: "Verse tập trung kể chuyện chi tiết", duration: "8-16 bars" },
+                { id: "verse-rap", name: "Verse (Rap)", description: "Verse dạng rap, nhịp nhanh", duration: "8-16 bars" },
+                { id: "verse-half-sung", name: "Verse (Half-sung / Talk-sung)", description: "Verse nửa hát nửa nói", duration: "8-16 bars" },
+                { id: "verse-minimal", name: "Verse (Minimal)", description: "Verse tối giản, ít nhạc cụ", duration: "8-16 bars" }
+            ]
+        },
+        "Pre-Chorus": {
+            icon: "",
+            color: "#ec4899",
+            variants: [
+                { id: "pre-chorus", name: "Pre-Chorus", description: "Phần chuẩn bị cho chorus, tăng cường độ", duration: "4-8 bars" },
+                { id: "pre-chorus-buildup", name: "Pre-Chorus (Build-up)", description: "Pre-chorus với build-up mạnh mẽ", duration: "4-8 bars" },
+                { id: "pre-chorus-transition", name: "Pre-Chorus (Spoken → Sung transition)", description: "Chuyển từ nói sang hát", duration: "4-8 bars" }
+            ]
+        },
+        "Chorus": {
+            icon: "",
+            color: "#f59e0b",
+            variants: [
+                { id: "chorus", name: "Chorus", description: "Điệp khúc chính, phần catchy và dễ nhớ nhất", duration: "8-16 bars" },
+                { id: "chorus-hook-heavy", name: "Chorus (Hook-heavy)", description: "Chorus tập trung vào hook mạnh", duration: "8-16 bars" },
+                { id: "chorus-minimal", name: "Chorus (Minimal)", description: "Chorus tối giản, tinh tế", duration: "8-16 bars" },
+                { id: "chorus-anthem", name: "Chorus (Anthem / Wide)", description: "Chorus rộng, hoành tráng, đại chúng", duration: "8-16 bars" },
+                { id: "chorus-call-response", name: "Chorus (Call & Response)", description: "Chorus dạng hỏi đáp", duration: "8-16 bars" }
+            ]
+        },
+        "Post-Chorus": {
+            icon: "",
+            color: "#10b981",
+            variants: [
+                { id: "post-chorus", name: "Post-Chorus", description: "Phần sau chorus, duy trì năng lượng", duration: "4-8 bars" },
+                { id: "post-chorus-vocal", name: "Post-Chorus (Vocal Hook)", description: "Post-chorus với vocal hook lặp lại", duration: "4-8 bars" },
+                { id: "post-chorus-instrumental", name: "Post-Chorus (Instrumental Hook)", description: "Post-chorus với instrumental hook", duration: "4-8 bars" }
+            ]
+        },
+        "Bridge": {
+            icon: "",
+            color: "#06b6d4",
+            variants: [
+                { id: "bridge", name: "Bridge", description: "Phần cầu nối, thay đổi không khí và giai điệu", duration: "8-16 bars" },
+                { id: "bridge-spoken", name: "Bridge (Spoken Word)", description: "Bridge với lời nói, rap hoặc monologue ngắn", duration: "8-16 bars" },
+                { id: "bridge-breakdown", name: "Bridge (Breakdown)", description: "Bridge dạng breakdown, giảm năng lượng", duration: "8-16 bars" },
+                { id: "bridge-key-change", name: "Bridge (Key / Mood change)", description: "Bridge đổi tone hoặc mood hoàn toàn", duration: "8-16 bars" },
+                { id: "bridge-monologue", name: "Bridge (Monologue)", description: "Bridge dạng độc thoại dài", duration: "8-16 bars" }
+            ]
+        },
+        "Drop": {
+            icon: "",
+            color: "#ef4444",
+            variants: [
+                { id: "drop", name: "Drop", description: "Phần drop chính, cao trào của bài hát", duration: "8-16 bars" },
+                { id: "drop-instrumental", name: "Drop (Instrumental)", description: "Drop không lời, chỉ nhạc", duration: "8-16 bars" },
+                { id: "drop-vocal-chop", name: "Drop (Vocal Chop)", description: "Drop với vocal chops mạnh mẽ", duration: "8-16 bars" },
+                { id: "drop-minimal", name: "Drop (Minimal / Bass-focused)", description: "Drop tối giản tập trung bass", duration: "8-16 bars" },
+                { id: "drop-delayed", name: "Drop (Delayed)", description: "Drop trì hoãn, tạo tension", duration: "8-16 bars" }
+            ]
+        },
+        "Breakdown-Interlude": {
+            icon: "",
+            color: "#6366f1",
+            variants: [
+                { id: "breakdown", name: "Breakdown", description: "Phần breakdown, giảm năng lượng đột ngột", duration: "4-8 bars" },
+                { id: "breakdown-spoken", name: "Breakdown (Spoken Word)", description: "Breakdown với lời nói hoặc rap", duration: "4-8 bars" },
+                { id: "interlude-dialogue", name: "Interlude (Dialogue)", description: "Interlude với đoạn hội thoại", duration: "4-8 bars" },
+                { id: "interlude-ambient", name: "Interlude (Ambient)", description: "Interlude với ambient và sound effects", duration: "4-8 bars" }
+            ]
+        },
+        "Outro-End": {
+            icon: "",
+            color: "#64748b",
+            variants: [
+                { id: "outro-instrumental", name: "Outro (Instrumental)", description: "Kết thúc không lời, chỉ nhạc", duration: "4-8 bars" },
+                { id: "outro-spoken", name: "Outro (Spoken Word)", description: "Kết thúc với lời nói", duration: "4-8 bars" },
+                { id: "outro-dialogue", name: "Outro (Dialogue)", description: "Kết thúc với đoạn hội thoại", duration: "4-8 bars" },
+                { id: "outro-hook-reprise", name: "Outro (Hook reprise)", description: "Kết thúc lặp lại hook chính", duration: "4-8 bars" },
+                { id: "end-hard-stop", name: "End (Hard stop)", description: "Kết thúc đột ngột, không fade", duration: "1-2 bars" },
+                { id: "end-fade-out", name: "End (Fade out)", description: "Kết thúc fade out từ từ", duration: "4-8 bars" }
+            ]
+        }
+    };
+
+    // Initialize Structure System
+    function initStructureSystem() {
+        // Populate all dropdowns with variants
+        Object.keys(STRUCTURE_CATEGORIES).forEach(categoryKey => {
+            const category = STRUCTURE_CATEGORIES[categoryKey];
+            const dropdown = document.querySelector(`.category-dropdown[data-category="${categoryKey}"]`);
+
+            if (dropdown) {
+                dropdown.innerHTML = category.variants.map(variant => `
+                    <div class="variant-option" data-variant-id="${variant.id}" data-category="${categoryKey}">
+                        <span class="variant-name">${variant.name}</span>
+                        <span class="variant-duration">${variant.duration}</span>
+                    </div>
+                `).join('');
+            }
+        });
+
+        // Setup category button toggles
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const category = btn.dataset.category;
+                const dropdown = document.querySelector(`.category-dropdown[data-category="${category}"]`);
+                const isOpen = dropdown && dropdown.classList.contains('open');
+
+                // Close all dropdowns
+                document.querySelectorAll('.category-dropdown').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+
+                // Toggle current
+                if (!isOpen && dropdown) {
+                    dropdown.classList.add('open');
+                    btn.classList.add('active');
+                }
+            });
+        });
+
+        // Setup variant selection
+        document.querySelectorAll('.variant-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const variantId = option.dataset.variantId;
+                const categoryKey = option.dataset.category;
+
+                // Add to structure
+                currentStructure.push({ id: variantId, category: categoryKey });
+                renderStructure();
+                saveState();
+
+                // Close dropdown
+                document.querySelectorAll('.category-dropdown').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.structure-category')) {
+                document.querySelectorAll('.category-dropdown').forEach(d => d.classList.remove('open'));
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            }
+        });
+    }
+
+    // Render Structure with Icons, Colors, and Delete Buttons
+    function renderStructure() {
+        if (!structureDisplay) return;
+        structureDisplay.innerHTML = '';
+
+        if (currentStructure.length === 0) {
+            structureDisplay.innerHTML = '<span class="placeholder-text">Chưa chọn cấu trúc...</span>';
+            return;
+        }
+
+        currentStructure.forEach((item, index) => {
+            // Find variant data
+            const category = STRUCTURE_CATEGORIES[item.category];
+            if (!category) return;
+
+            const variant = category.variants.find(v => v.id === item.id);
+            if (!variant) return;
+
+            const tag = document.createElement('div');
+            tag.className = 'structure-tag';
+            tag.dataset.index = index;
+            tag.dataset.variantId = item.id;
+            tag.dataset.category = item.category;
+            tag.style.borderColor = category.color + '55';
+            tag.style.background = `linear-gradient(135deg, ${category.color}25, ${category.color}10)`;
+
+            tag.innerHTML = `
+                <span class="structure-tag-icon">${category.icon}</span>
+                <span class="structure-tag-name">${variant.name}</span>
+                <span class="structure-tag-remove">×</span>
+            `;
+
+            // Hover tooltip
+            tag.addEventListener('mouseenter', (e) => showStructureTooltip(e, variant, category));
+            tag.addEventListener('mouseleave', hideStructureTooltip);
+
+            // Delete individual tag
+            const removeBtn = tag.querySelector('.structure-tag-remove');
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentStructure.splice(index, 1);
+                renderStructure();
+                saveState();
+            });
+
+            structureDisplay.appendChild(tag);
+        });
+    }
+
+    // Show Tooltip
+    function showStructureTooltip(event, variant, category) {
+        const tooltip = document.getElementById('structure-tooltip');
+        if (!tooltip) return;
+
+        tooltip.innerHTML = `
+            <div class="tooltip-header">
+                <span class="tooltip-title">${variant.name}</span>
+            </div>
+            <div class="tooltip-description">${variant.description}</div>
+            <div class="tooltip-duration">⏱️ ${variant.duration}</div>
+        `;
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        const tooltipHeight = 120; // Approximate height
+
+        tooltip.style.left = rect.left + 'px';
+        tooltip.style.top = (rect.top - (tooltipHeight / 2) - 18) + 'px';
+        tooltip.classList.add('visible');
+    }
+
+    // Hide Tooltip
+    function hideStructureTooltip() {
+        const tooltip = document.getElementById('structure-tooltip');
+        if (tooltip) tooltip.classList.remove('visible');
+    }
+
+    // Clear All Button
     if (clearStructureBtn) {
         clearStructureBtn.addEventListener('click', () => {
             currentStructure = [];
@@ -736,27 +969,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function renderStructure() {
-        if (!structureDisplay) return;
-        structureDisplay.innerHTML = '';
-        if (currentStructure.length === 0) {
-            structureDisplay.innerHTML = '<span class="placeholder-text">Chưa chọn cấu trúc...</span>';
-            return;
-        }
-
-        currentStructure.forEach((part, index) => {
-            const tag = document.createElement('div');
-            tag.className = 'structure-tag';
-            tag.innerText = part;
-            tag.title = "Click to remove";
-            tag.addEventListener('click', () => {
-                currentStructure.splice(index, 1);
-                renderStructure();
-                saveState();
-            });
-            structureDisplay.appendChild(tag);
-        });
+    // Initialize on load
+    if (document.querySelector('.category-btn')) {
+        initStructureSystem();
     }
+
 
     // --- TAB SWITCHING ---
     tabs.forEach(tab => {
@@ -790,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load state
     chrome.storage.local.get([
         'gemini_api_key', 'gemini_model', 'saved_concept', 'saved_artist', 'saved_vibe', 'saved_custom_vibe',
-        'saved_gender', 'saved_region', 'prompt_history', 'saved_system_prompt', 'saved_structure'
+        'saved_gender', 'saved_region', 'prompt_history', 'saved_system_prompt', 'saved_structure', 'saved_music_focus'
     ], (res) => {
         if (res.gemini_api_key) apiKeyInput.value = res.gemini_api_key;
         if (res.gemini_model) modelSelect.value = res.gemini_model;
@@ -798,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res.saved_artist) artistInput.value = res.saved_artist;
         if (res.saved_gender) genderSelect.value = res.saved_gender;
         if (res.saved_region) regionSelect.value = res.saved_region;
+        if (res.saved_music_focus && musicFocusSelect) musicFocusSelect.value = res.saved_music_focus;
         if (res.saved_language && languageSelect) {
             languageSelect.value = res.saved_language;
             // Initial check for region visibility
@@ -861,7 +1079,8 @@ document.addEventListener('DOMContentLoaded', () => {
             saved_language: languageSelect ? languageSelect.value : "Vietnamese",
             // Save Advanced Settings
             saved_system_prompt: customSystemPromptInput ? customSystemPromptInput.value.trim() : "",
-            saved_structure: currentStructure
+            saved_structure: currentStructure,
+            saved_music_focus: musicFocusSelect ? musicFocusSelect.value : "balanced"
         });
     };
 
@@ -885,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    [genderSelect, regionSelect, modelSelect, languageSelect].forEach(el => {
+    [genderSelect, regionSelect, modelSelect, languageSelect, musicFocusSelect].forEach(el => {
         if (el) el.addEventListener('change', saveState);
     });
 
@@ -1148,7 +1367,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 isInstrumental: isInstrumental,
                 isCustomLyrics: isCustomLyrics,
                 customSystemPrompt: customSystemPromptInput ? customSystemPromptInput.value.trim() : "",
-                customStructure: currentStructure.join(', '),
+                customStructure: currentStructure,
+                musicFocus: musicFocusSelect ? musicFocusSelect.value : "balanced",
                 vocalTraits: Array.from(document.querySelectorAll('#vocal-traits .pro-chip.active')).map(c => c.dataset.val),
                 vocalPresets: Array.from(document.querySelectorAll('#vocal-presets .pro-chip.active')).map(c => c.dataset.val),
                 emotions: Array.from(document.querySelectorAll('#emotion-chips .pro-chip.active')).map(c => c.dataset.val)

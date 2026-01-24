@@ -8,10 +8,20 @@ export const Prompts = {
      * Generates the main composition prompt for Suno
      */
     composeMusic: (params) => {
-        const { concept, vibe, artist, gender, region, language, isInstrumental, isCustomLyrics, customSystemPrompt, customStructure } = params;
+        const { concept, vibe, artist, gender, region, language, isInstrumental, isCustomLyrics, customSystemPrompt, customStructure, musicFocus } = params;
+
+        let focusContext = "";
+        if (musicFocus === 'lyrics') {
+            focusContext = `\n  - TRỌNG TÂM SÁNG TÁC: Tập trung tối đa vào phần LỜI (Lyrics). Hãy làm cho ca từ thực sự sâu sắc, sử dụng nhiều biện pháp tu từ, vần điệu (Rhyme) phức tạp và giàu hình ảnh cảm xúc.`;
+        } else if (musicFocus === 'music') {
+            focusContext = `\n  - TRỌNG TÂM SÁNG TÁC: Tập trung tối đa vào phần NHẠC (Style/Production). Hãy tạo ra một Style Tag chuyên sâu nhất có thể, chú trọng vào hòa âm, phối khí, hiệu ứng và nhạc cụ để Suno AI tạo ra bản phối đột phá.`;
+        } else if (musicFocus === 'fusion') {
+            focusContext = `\n  - TRỌNG TÂM SÁNG TÁC: Phối hợp linh hoạt (Fusion). Hãy tìm điểm giao thoa tốt nhất giữa lời và nhạc để cả hai nâng đỡ nhau hoàn hảo nhất.`;
+        }
 
         const artistContext = artist ? `\n    Đặc biệt, hãy nghiên cứu sâu và mô phỏng "ADN âm nhạc" của nghệ sĩ: "${artist}". 
-        - Phong cách hát (Vocal Style): Cách luyến láy, ngân rung đặc trưng.` : "";
+        - PHÂN TÍCH VÀ MÔ PHỎNG PHONG CÁCH: Hãy trích xuất cách hát (Vocal Style), cách luyến láy, ngân rung, và cấu trúc câu chữ đặc trưng của họ.
+        - QUY TẮC BẢO MẬT & BẢN QUYỀN: Tuyệt đối KHÔNG ĐƯỢC nhắc lại tên nghệ sĩ "${artist}" trong các trường "style", "title" hoặc "lyrics" của JSON đầu ra. Hãy chuyển hóa tên nghệ sĩ thành các thẻ tag nhạc lý tương đương.` : "";
 
         const genderContext = gender && gender !== 'Random' ? `\n    - Giới tính giọng hát (Vocal Gender): BẮT BUỘC phải là "${gender}".` : "";
 
@@ -33,19 +43,60 @@ export const Prompts = {
         // --- PROMPT MODES ---
         let promptModeInstructions = "";
 
+
         let structureInstruction = "";
-        if (customStructure && customStructure.length > 0) {
+        if (customStructure && (Array.isArray(customStructure) || typeof customStructure === 'string')) {
+            // Parse structure format
+            let structureList = "";
+
+            if (Array.isArray(customStructure)) {
+                structureList = customStructure.map(item => {
+                    // item format: { id: "intro-ambient", category: "Intro" }
+                    if (typeof item === 'object' && item.id) {
+                        // Extract variant name from ID
+                        const variantName = item.id.split('-').map(word =>
+                            word.charAt(0).toUpperCase() + word.slice(1)
+                        ).join(' ');
+                        return `[${variantName}]`;
+                    } else {
+                        // Fallback for old format (simple strings)
+                        return `[${item}]`;
+                    }
+                }).join(', ');
+            } else {
+                // If it's already a string, just use it
+                structureList = customStructure;
+            }
+
             structureInstruction = `
         ### YÊU CẦU CẤU TRÚC ĐẶC BIỆT (STRUCTURE):
         - Bạn BẮT BUỘC phải tuân theo cấu trúc bài hát sau đây theo đúng trình tự:
-        [${customStructure}]
+        ${structureList}
         - Hãy phân bổ nội dung lời bài hát sao cho phù hợp với từng phần của cấu trúc này.
+        - Chú ý đặc điểm của từng variant:
+          * "Instrumental" = không có lời, chỉ nhạc cụ
+          * "Spoken Word" = lời nói, không hát
+          * "Dialogue" = đoạn hội thoại
+          * "Ambient / FX" = âm thanh môi trường, hiệu ứng
+          * "Vocal Chop" = vocal chops, cắt giọng
+          * "Rap" = rap, nhịp nhanh
+          * "Minimal" = tối giản, ít nhạc cụ
+          * "Build-up" = tăng cường độ dần
+          * "Hook-heavy" = tập trung vào hook
+          * "Anthem / Wide" = hoành tráng, rộng
+          * "Call & Response" = hỏi đáp
+          * "Breakdown" = giảm năng lượng đột ngột
+          * "Key / Mood change" = đổi tone hoặc mood
+          * "Delayed" = trì hoãn, tạo tension
+          * "Hard stop" = kết thúc đột ngột
+          * "Fade out" = kết thúc fade out
             `;
         } else {
             structureInstruction = `
         - Cấu trúc chuyên nghiệp: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Chorus], [Bridge - Cao trào], [Outro].
             `;
         }
+
 
         if (isInstrumental) {
             promptModeInstructions = `
@@ -94,13 +145,14 @@ export const Prompts = {
         return `
     ${systemPersona}
     ${artistContext}
+    ${focusContext}
 
     ${promptModeInstructions}
 
     ### YÊU CẦU VỀ STYLE (Hòa âm phối khí):
-    Phải bao gồm các thẻ tag nhạc lý chuyên sâu bằng tiếng Anh để Suno AI hiểu được linh hồn bài hát. CẤU TRÚC BẮT BUỘC:
-    - [Sub-genre], [BPM], [Key], [Main Instruments], [Vocal Character của ${artist || 'nghệ sĩ'}], [${gender || 'Vocal Gender'}], [Atmosphere], [Studio Effects].
-    - Ví dụ: Modern V-Pop, 100 BPM, C# Minor, Catchy Synth Pluck, Breathiness, Rap-singing, High-end Reverb.
+    Phải bao gồm các thẻ tag nhạc lý chuyên sâu bằng tiếng Anh để Suno AI hiểu được linh hồn bài hát. CẤU TRÚC BẮT BUỘC (KHÔNG ĐƯỢC chứa tên nghệ sĩ):
+    - [Sub-genre], [BPM], [Key], [Main Instruments], [Vocal Character], [Vocal Gender], [Atmosphere], [Studio Effects].
+    - Ví dụ: Modern V-Pop, 100 BPM, C# Minor, Catchy Synth Pluck, Breathiness, Rap-singing, High-end Reverb. (Tuyệt đối không dùng tên nghệ sĩ trong ví dụ này).
 
     ### ĐỊNH DẠNG ĐẦU RA (JSON DUY NHẤT):
     {
@@ -212,7 +264,8 @@ export const Prompts = {
     1. Phải bao gồm: [Sub-genre], [BPM], [Key], [Main Instruments], [Atmosphere], [Production Style].
     2. Các thẻ tag phải bằng tiếng Anh.
     3. Nếu nghệ sĩ được nhắc đến, hãy trích xuất đặc trưng âm nhạc của họ (VD: "Sơn Tùng M-TP" -> "Modern V-Pop, Melodic Rap, Synth-heavy").
-    4. Chỉ trả về duy nhất chuỗi thẻ tag, cách nhau bởi dấu phẩy. Không giải thích gì thêm.
+    4. QUY TẮC NGHIÊM NGẶT: Chỉ trả về duy nhất chuỗi thẻ tag, cách nhau bởi dấu phẩy. KHÔNG ĐƯỢC bao gồm tên nghệ sĩ "${artist || ''}" trong chuỗi kết quả.
+    5. Không giải thích gì thêm.
     
     Ví dụ: Modern V-Pop, 105 BPM, G Major, Clean Electric Guitar, Atmospheric Pads, Emotional Male Vocals, High-end Reverb.
         `;

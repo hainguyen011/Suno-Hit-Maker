@@ -122,6 +122,19 @@
                         </div>
                     </div>
 
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <div style="flex: 1;">
+                            <label>TRỌNG TÂM</label>
+                            <select id="music-focus"
+                                style="width: 100%; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 0.85rem; outline: none;">
+                                <option value="balanced">Cân bằng (Default)</option>
+                                <option value="lyrics">Ưu tiên Lời (Lyrics)</option>
+                                <option value="music">Ưu tiên Nhạc (Music)</option>
+                                <option value="fusion">Phối hợp (Fusion)</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="vibe-selector">
                         <div class="vibe-chip active" data-vibe="V-Pop Viral">V-Pop Viral</div>
                         <div class="vibe-chip" data-vibe="Indie Chill">Indie Chill</div>
@@ -249,25 +262,116 @@
                         </div>
                     </div>
 
-                    <!-- 1.2. Structure Builder -->
+                    <!-- 1.2. Structure Builder (Professional Hierarchical) -->
                     <div class="studio-accordion expanded">
                         <div class="accordion-header">
                             <label>CẤU TRÚC (STRUCTURE)</label>
                             <div class="accordion-icon">▼</div>
                         </div>
                         <div class="accordion-body">
-                            <p class="feature-intro">Sắp xếp cấu trúc các phần (Intro, Verse, Chorus...) của bài hát.
-                            </p>
+                            <p class="feature-intro">Sắp xếp cấu trúc bài hát với 40+ variants chuyên nghiệp.</p>
+
+                            <!-- Structure Display Area -->
                             <div id="structure-display" class="structure-display">
-                                <span class="placeholder-text">Chưa chọn...</span>
+                                <span class="placeholder-text">Chưa chọn cấu trúc...</span>
                             </div>
-                            <div class="structure-controls">
-                                <button class="struct-btn" data-part="Intro">Intro</button>
-                                <button class="struct-btn" data-part="Verse">Verse</button>
-                                <button class="struct-btn" data-part="Chorus">Chorus</button>
-                                <button class="struct-btn" data-part="Bridge">Bridge</button>
-                                <button class="struct-btn" data-part="Drop">Drop</button>
-                                <button class="struct-btn" data-part="Outro">End</button>
+
+                            <!-- Tooltip Container -->
+                            <div id="structure-tooltip" class="structure-tooltip"></div>
+
+                            <!-- Structure Controls with Dropdowns -->
+                            <div class="structure-controls-grid">
+                                <!-- Intro Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Intro">
+                                        <span class="category-icon"></span>
+                                        <span>Intro</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Intro"></div>
+                                </div>
+
+                                <!-- Verse Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Verse">
+                                        <span class="category-icon"></span>
+                                        <span>Verse</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Verse"></div>
+                                </div>
+
+                                <!-- Pre-Chorus Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Pre-Chorus">
+                                        <span class="category-icon"></span>
+                                        <span>Pre-Chorus</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Pre-Chorus"></div>
+                                </div>
+
+                                <!-- Chorus Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Chorus">
+                                        <span class="category-icon"></span>
+                                        <span>Chorus</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Chorus"></div>
+                                </div>
+
+                                <!-- Post-Chorus Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Post-Chorus">
+                                        <span class="category-icon"></span>
+                                        <span>Post-Chorus</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Post-Chorus"></div>
+                                </div>
+
+                                <!-- Bridge Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Bridge">
+                                        <span class="category-icon"></span>
+                                        <span>Bridge</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Bridge"></div>
+                                </div>
+
+                                <!-- Drop Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Drop">
+                                        <span class="category-icon"></span>
+                                        <span>Drop</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Drop"></div>
+                                </div>
+
+                                <!-- Breakdown/Interlude Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Breakdown-Interlude">
+                                        <span class="category-icon"></span>
+                                        <span>Break/Interlude</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Breakdown-Interlude"></div>
+                                </div>
+
+                                <!-- Outro/End Category -->
+                                <div class="structure-category">
+                                    <button class="category-btn" data-category="Outro-End">
+                                        <span class="category-icon"></span>
+                                        <span>Outro/End</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="category-dropdown" data-category="Outro-End"></div>
+                                </div>
+
+                                <!-- Clear All Button -->
                                 <button class="struct-btn clear-btn" id="clear-structure">×</button>
                             </div>
                         </div>
