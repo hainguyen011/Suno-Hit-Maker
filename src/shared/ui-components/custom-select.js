@@ -15,6 +15,9 @@ export class CustomSelect {
     }
 
     init() {
+        // Store reference to this instance in the select element
+        this.select._customSelect = this;
+
         // Hide native select
         this.select.style.display = 'none';
 

@@ -15,20 +15,11 @@ export class SettingsUI {
     }
 
     mount() {
-        if (!this.modelPanel) return;
+        // Get the existing button from HTML
+        const btn = document.getElementById('btn-check-models');
 
-        // Add "Check Models" button if not exists
-        if (!document.getElementById('btn-check-models')) {
-            const btn = document.createElement('button');
-            btn.id = 'btn-check-models';
-            btn.className = 'mini-btn'; // Use existing class or style inline
-            btn.style.marginTop = '8px';
-            btn.style.width = '100%';
-            btn.innerText = '🔄 Cập nhật danh sách Model';
-            btn.title = "Tải danh sách model mới nhất từ Google";
-
-            this.modelPanel.appendChild(btn);
-
+        if (btn) {
+            // Attach event listener to the existing button
             btn.onclick = () => this.handleCheckModels();
         }
     }
@@ -73,7 +64,12 @@ export class SettingsUI {
                 this.modelSelect.value = defaultModel;
             }
 
-            updateLog(this.statusLog, `Success: Đã tìm thấy ${models.length} hình mẫu!`);
+            // IMPORTANT: Refresh CustomSelect to display new options
+            if (this.modelSelect._customSelect) {
+                this.modelSelect._customSelect.refresh();
+            }
+
+            updateLog(this.statusLog, `Success: Đã tìm thấy ${models.length} model!`);
 
             // Save logic is handled by main popup 'change' listener, 
             // but we might want to trigger it manually to save the new list? 
@@ -85,7 +81,7 @@ export class SettingsUI {
         } finally {
             if (btn) {
                 btn.disabled = false;
-                btn.innerText = '🔄 Cập nhật danh sách Model';
+                btn.innerText = 'Cập nhật danh sách Model';
             }
         }
     }

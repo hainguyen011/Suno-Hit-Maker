@@ -103,7 +103,16 @@ export const Prompts = {
         ### CHẾ ĐỘ: INSTRUMENTAL (KHÔNG LỜI)
         - Người dùng muốn tạo một bản nhạc không lời dựa trên mô tả: "${concept}".
         - Yêu cầu: KHÔNG được tạo ra bất kỳ lời bài hát nào.
-        - Trường "lyrics" trong JSON phải để trống hoặc ghi "[Instrumental]".
+        - Trường "lyrics" chỉ chứa:
+          * Các thẻ cấu trúc: [Tên phần – Instrumental] hoặc [Tên phần – Mô tả nhạc cụ]
+          * Vocal directions (nếu cần): (Instrumental only - English instruction)
+        - Ví dụ:
+          [Intro – Instrumental]
+          (Instrumental only - gentle, atmospheric)
+          [Verse 1 – Piano and strings]
+          (Instrumental only - building tension)
+          [Chorus – Full orchestra]
+          [Outro – Instrumental fade out]
         - Tập trung tối đa vào phần "style" để diễn tả đúng không khí (Atmosphere) và nhạc cụ.
             `;
         } else if (isCustomLyrics) {
@@ -115,7 +124,16 @@ export const Prompts = {
         - Nhiệm vụ của bạn:
         1. Phân tích lời bài hát kết hợp với phong cách chủ đạo là: "${vibe}".${genderContext}${regionDetailedContext}${languageContext}
         2. Chọn ra "style" và "title" phù hợp nhất dựa trên các thông số trên.
-        3. Giữ nguyên lời bài hát gốc trong trường "lyrics". Bạn có thể thêm các thẻ [Meta Tags] như [Verse], [Chorus] vào trước các đoạn nếu chưa có, nhưng KHÔNG được thay đổi nội dung lời.
+        3. Giữ nguyên lời bài hát gốc trong trường "lyrics". Bạn có thể thêm các thẻ [Meta Tags] như [Verse], [Chorus] vào trước các đoạn nếu chưa có.
+        4. QUAN TRỌNG - Xử lý dấu ngoặc đơn ():
+           a) Nếu là mô tả nhạc cụ/cấu trúc (KHÔNG có "Instrumental only"), chuyển sang format []:
+              - (Tiếng đàn tranh...) → [Intro – Đàn tranh and guitar]
+              - (Piano solo) → [Interlude – Piano solo]
+           b) Nếu đã có format đúng (Instrumental only - instruction), GIỮ NGUYÊN:
+              - (Instrumental only - soft, melancholic) → GIỮ NGUYÊN
+              - (Instrumental only - powerful vocals) → GIỮ NGUYÊN
+           c) Nếu thiếu tiền tố "Instrumental only", THÊM VÀO:
+              - (soft piano) → (Instrumental only - soft piano)
             `;
         } else {
             // Default: Creating from Concept
@@ -129,6 +147,52 @@ export const Prompts = {
         ${structureInstruction}
         - Kỹ thuật: Sử dụng ẩn dụ, hình ảnh so sánh độc đáo, vần điệu (Rhyme scheme) chặt chẽ giữa các câu.
         - Metatags: Thêm các thẻ lệnh Suno như [Drop], [Guitar Solo], [Build-up], [Big Finish] ở các vị trí hợp lý.
+        
+        ### ĐỊNH DẠNG CẤU TRÚC VÀ CHỈ DẪN:
+        
+        **1. CẤU TRÚC BÀI HÁT (Structure Tags - Dùng dấu ngoặc vuông []):**
+        - Chỉ sử dụng dấu ngoặc vuông [] cho các thẻ cấu trúc phần bài hát
+        - Với các phần không có lời, format: [Tên phần – Mô tả ngắn gọn]
+        - Ví dụ đúng:
+          * [Intro – Instrumental]
+          * [Intro – Acoustic guitar and đàn tranh]
+          * [Bridge – Music only]
+          * [Outro – Instrumental fade out]
+          * [Interlude – Piano solo]
+        
+        **2. CHỈ DẪN GIỌNG HÁT/NHẠC CỤ (Vocal Directions - Dùng dấu ngoặc đơn ()):**
+        - BẮT BUỘC sử dụng format: (Instrumental only - English instruction)
+        - Tiền tố "Instrumental only" LUÔN LUÔN phải có để AI không hát phần này
+        - Chỉ dẫn phải bằng tiếng Anh, mô tả cách thể hiện/cảm xúc/nhạc cụ
+        - Đặt trên một dòng riêng, TRƯỚC hoặc SAU câu hát liên quan
+        - Ví dụ đúng:
+          * (Instrumental only - soft, melancholic piano)
+          * (Instrumental only - whispered, intimate)
+          * (Instrumental only - powerful, soaring vocals)
+          * (Instrumental only - gentle acoustic guitar strumming)
+          * (Instrumental only - dramatic orchestral build-up)
+        
+        
+        **3. VÍ DỤ ÁP DỤNG ĐÚNG:**
+        
+        [Verse 1]
+        Em nhớ anh trong đêm mưa rơi
+        (Instrumental only - soft, melancholic)
+        Từng giọt mưa như lòng ta chơi vơi
+        
+        [Chorus]
+        (Instrumental only - powerful, emotional)
+        Mãi yêu em dù đời có xa cách
+        
+        
+        **4. VÍ DỤ SAI (TUYỆT ĐỐI KHÔNG DÙNG):**
+        
+        [Intro]
+        (Tiếng đàn tranh rải nhẹ nhàng...)  ← SAI: Thiếu "Instrumental only"
+        (Guitar acoustic)  ← SAI: Không có tiền tố
+        
+        
+        - Nếu có lời hát trong phần đó, chỉ cần ghi thẻ [Verse], [Chorus], etc. rồi xuống dòng và viết lời ngay.
             `;
         }
 
